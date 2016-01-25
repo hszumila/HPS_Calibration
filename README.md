@@ -16,7 +16,11 @@ strict geometric cut requires that there is no hit above threshold to the left
 and right crystals but there must be a hit above and below. A loose geometric
 cut requires that there can be no hit in the left and crystals but there must
 be a hit in a crystal above or below. A counting cut requires that any two
-crystals in the same column have a hit above threshold and not the ones to the left and right. 
+crystals in the same column have a hit above threshold and not the ones to the
+left and right. 
+
+Make directories: cosmicInput
+		  convolFit
 
 Put raw files in the folder cosmicInput.  
 
