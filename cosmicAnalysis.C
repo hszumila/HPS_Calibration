@@ -1,14 +1,14 @@
 /////////////////////////////////////////////////////////////////// 
 // Author: Holly Szumila 
 // Email: hvanc001@odu.edu
-// Updated: 27 April 2015
+// Updated: 25 Jan 2016
 //
 // This code calculates the gains for individual crystals in the 
 // HPS Ecal. This code takes in ROOT files that can be produced with
 // vectors for each crystal containing the adc counts in each event.
 // This file can be compiled in ROOT as:
 // .L cosmicAnalysis.C++
-// rawGeoCut()
+// rawGeoCut(0)
 // getGain()
 //
 // Pedestals are calculated per event 
@@ -24,8 +24,8 @@
 #define NR 11
 #define ADC2V 0.25
 //signal window, originally 35-55, now shifted by 15
-#define MINS 50 
-#define MAXS 70
+#define MINS 35//50 
+#define MAXS 55//70
 //pedestal window
 #define MINP 10
 #define MAXP 30
@@ -44,12 +44,13 @@
 #include "TStyle.h"
 #include "TLegend.h"
 #include "TDirectory.h"
-#include "chainfilelist.C"
-#include "MyRootUtil.C"
-#include "ProgressMeter.C"
+#include "dependency/chainfilelist.C"
+#include "dependency/MyRootUtil.C"
+#include "dependency/ProgressMeter.C"
 #include "TF1.h"
-#include "TROOT.h"
-#include "langaus.C"
+#include "dependency/langaus.C"
+
+//use namespace standard;
 
 // This removes the crystals in the electron hole
 bool ishole(const int x,const int y)
@@ -62,7 +63,7 @@ struct fadc_t
   int adc[NX][NY][NSAMP]; // adc value for each time sample
   int pulse[NX][NY];      // adc integrated over first NSAMPINT samples
   float ped[NX][NY];      // pedestal
-}
+};
 void InitTreeFADC(TTree *t,fadc_t &t_)
 {
     if (!t) return;
@@ -75,20 +76,22 @@ fadc_t FADC;
 void LoadTree()
 {
     if (CHAIN) return;
-    CHAIN=chainfiledir("cosmicFiles","Tadc");
+    CHAIN=chainfiledir("cosmicInput","Tadc");
     InitTreeFADC((TTree*)CHAIN,FADC);
 }
 // rawGeoCut is used to plot the mip signal (pedestal subtracted) and 
 // use cuts to plot the value (cuts on raw value in time window and geometric)
 // set q to 0 for strict, set q to 1 for loose
+
 void rawGeoCut(int q)
 {
+  
   // Chain files
-  TChain *t=chainfiledir("cosmicFiles","Tadc");
+  TChain *t=chainfiledir("cosmicInput","Tadc");
 
   fadc_t t_;
   InitTreeFADC(t,t_);
-
+  
   // Output file
   TFile *f=new TFile("mipSigCut.root","RECREATE");
   
@@ -111,7 +114,8 @@ void rawGeoCut(int q)
 	    } // end !ishole
 	} // end jy iteration
     } //end jx iteration
-
+  
+  
   // Loop through events
   for (int ii=0;ii<t->GetEntries();ii++)
     {
@@ -306,7 +310,7 @@ void rawGeoCut(int q)
 			      mipSigCut[ix][iy]->Fill(signal[ix][iy]);
 			    }
 			}
-		      if (q==1) //loose geometry cut
+		      else if (q==1) //loose geometry cut
 			{
 			  if(geomCut0==0&&geomCut1==0) 
 			    {
@@ -326,15 +330,16 @@ void rawGeoCut(int q)
 	}// end loop over y
 	  
     }//end entry loop
-
+  
   WriteRemainingHistos(1);
 
   f->Close();
 }
 //////////////////////////////////////////////////////////////////////////////
+
 void rawCountingCut(){
   // Chain files
-  TChain *t=chainfiledir("cosmicFiles","Tadc");
+  TChain *t=chainfiledir("cosmicInput","Tadc");
 
   fadc_t t_;
   InitTreeFADC(t,t_);
@@ -534,9 +539,8 @@ void rawCountingCut(){
   f->Close();
 }
 
-
-
 /////////////////////////////////////////////////////////////////////////////
+
 void getGain(){
 
   // open the root file histogram
@@ -547,8 +551,9 @@ void getGain(){
   TH1D *mipSigCut[NX][NY];
   //  TF1 *fcosmic=CosmicSignal();
   //  fcosmic->SetLineColor(4);
-
+  
   int ii=0;
+  
   for (int jy=0; jy<NY; jy++)
 	{
 	  // loop over crystal x
@@ -561,7 +566,7 @@ void getGain(){
 		  
 		  if (mipSigCut[jx][jy]) {
 
-		    //////////////using convolution fit///////////////////////////////////
+		    ///using convolution fit//
 		    // Setting fit range and start values
 		    Double_t fr[2];
 		    Double_t sv[4], pllo[4], plhi[4], fp[4], fpe[4];
@@ -577,11 +582,10 @@ void getGain(){
 		    pllo[0]=0.5; pllo[1]=12.0; pllo[2]=50.0; pllo[3]=0.4;
 		    plhi[0]=5.0; plhi[1]=50.0; plhi[2]=2000.0; plhi[3]=7.0;
 		    sv[0]=1.8; sv[1]=25.0; sv[2]=500.0; sv[3]=3.0;
-		    //sv[1]=mipSigCut[jx][jy] ->GetMean();		  
 		    Double_t chisqr;
 		    Int_t    ndf;		  
 		    lfit[jx][jy] = langaufit(mipSigCut[jx][jy],fr,sv,pllo,plhi,fp,fpe,&chisqr,&ndf);
-		    //////////////using convolution fit///////////////////////////////////
+		    ///using convolution fit///
 		    Double_t SNRPeak, SNRFWHM;
 		    langaupro(fp,SNRPeak,SNRFWHM);		  
 		    printf("Fitting done\nPlotting results...\n");		  
@@ -593,25 +597,19 @@ void getGain(){
 		    mipSigCut[jx][jy]->GetXaxis()->SetRange(8,70);
 		    mipSigCut[jx][jy]->Draw();
 		    lfit[jx][jy]->Draw("lsame");
-		    //fcosmic->DrawClone("SAME");
-		    //gStyle->SetOptFit(11111);
-		    
+		    		    
 		    gPad->Update();
 		    gPad->SaveAs(Form("convolFit/Cry_%d_%d.C",jx,jy));
 		    ii++;
 
-		    //	  if (chisqr/ndf < 3)
-		    //    {
 		    MPV[jx][jy] = SNRPeak; 
-		    //    } 
-		    //	  else{
-		    //	    MPV[jx][jy] = -999;
-		    //	  }	
-        
+		    
+		  }//end if mipSigCut[][]
 		}//end ishole
 	    }//end loop x
 	}//end loop y
 
+	  
   //Plot gain values
   //Fit histograms and put into colorful view of calorimeter with MPV:
   TCanvas *gainC=new TCanvas("gainC","GainCalibrations",1200,800);
@@ -653,7 +651,7 @@ void getGain(){
 	  if (!ishole(lx,ly))
 	    {
 	      if(mipSigCut[lx][ly]){
-		Rates->SetBinContent(lx+3,ly+2,mipSigCut[lx][ly]->GetEntries());		       
+		Rates->SetBinContent(lx+3,ly+2,mipSigCut[lx][ly]->GetEntries());      
 		Rates->Draw("colz");
 	      }	      
 	    }
@@ -665,8 +663,10 @@ void getGain(){
  rateC->Close();
 
  f->Close();
- FILE *gainsOut = fopen("gains.txt","w");
- for (int ny=0; ny<NY; ny++)
+
+ ofstream gainsOut;
+ gainsOut.open("gains.txt");
+  for (int ny=0; ny<NY; ny++)
    {
      // loop over crystal x
      for (int nx=0; nx<NX; nx++)
@@ -674,15 +674,18 @@ void getGain(){
 	 // skip the hole
 	 if (!ishole(nx,ny))
 	   {
+	     float val = 18.3/(MPV[nx][ny]*4);
 	     if (MPV[nx][ny]>-900){
-	       cout<<nx<<"\t"<<ny<<"\t"<<18.3/(MPV[nx][ny]*4)<<endl;
-	       fprintf("%d \t %d \t %f",nx,ny,18.3/(MPV[nx][ny]*4));
+	       gainsOut<<nx<<"\t"<<ny<<"\t"<<val<<endl;
+	       //fprintf("%d \t %d \t %f",nx,ny,val);
 	     }
-	     else{cout<<nx<<"\t"<<ny<<"\t"<<0.2<<endl;}
-	     
+	     else{gainsOut<<nx<<"\t"<<ny<<"\t"<<0.2<<endl;}
+
 	   }
        }
    }
- fclose(gainsOut);
+  gainsOut.close();
+ 
 }
+
 
